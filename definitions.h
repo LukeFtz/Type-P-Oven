@@ -59,4 +59,4 @@ const char rootCACert[] PROGMEM = "-----BEGIN CERTIFICATE-----\n"
 #define ktcCS   D6
 #define ktcSO   D7
 
-#define rele D0
+#define rele 16

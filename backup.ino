@@ -48,7 +48,7 @@ long currentSec=0;
 long definedTemperature;
 int currentTemperature;
 
-long positionToGo;
+long positionToGo=0L;
 bool moving = false;
 
 AccelStepper motorStepper(FULLSTEP, motorPin1, motorPin3, motorPin2, motorPin4);
@@ -59,6 +59,8 @@ bool startHeatOven = false;
 
 bool startRecycling = false;
 bool firstTimeRecycle = true;
+
+bool setDefault = false;
 
 // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@ temporaryData @@@@@@@@@@@@@@@@@@@@@@@@@@
 bool aux = true;
@@ -326,7 +328,15 @@ void streamCallback(StreamData data)
     }else if (dataFromApp["func"]=="STRT_RECYCLE"){
       dataToApp.clear();
       startRecycling=true;
+    }else if(dataFromApp["func"]=="CANCEL_HEAT"){
+      cancelHeatAction();
+    }else if (dataFromApp["func"]=="CANCEL_RECYCLE"){
+      cancelRecycleAction();
     }
+    // }else if (dataFromApp["func"]=="SET_DEFAULT"){
+    //   setDefault=true;
+    //   setDefaultPosition();
+    // }
   }
   dataFromApp.clear();
 }
@@ -349,6 +359,7 @@ void prepareOven() {
   dataToApp.clear();
   positionToGo = -(maxPosition * definedTemperature) / maxTemp;
   motorStepper.moveTo(positionToGo);
+  Serial.println("positionToGo");
   moving = true;
 
   while (moving) {
@@ -371,6 +382,9 @@ void setDefaultPosition() {
     setPositionZero();
     yield();
   }
+  // if(setDefault){
+    
+  // }
 }
 
 void setPositionZero() {
@@ -380,6 +394,30 @@ void setPositionZero() {
     Serial.println(motorStepper.currentPosition());
     moving = false;
   }
+}
+
+void cancelHeatAction(){
+  dataToApp.clear();
+  // if (startHeatOven){
+    digitalWrite(rele, HIGH);
+    startHeatOven = false;
+    firstTimeHeat = true;
+  // }
+  Serial.println("HEAT canceled");
+  dataToApp.add("func", "HEAT_CANCELED");
+  Firebase.setJSON(fbdo, PATH_TO_APP, dataToApp);
+}
+
+void cancelRecycleAction(){
+  dataToApp.clear();
+  // if (startRecycling) {
+    digitalWrite(rele, HIGH);
+    startRecycling = false;
+    firstTimeRecycle = true;
+    // setDefaultPosition();
+  // }
+  dataToApp.add("func", "RECYCLE_CANCELED");
+  Firebase.setJSON(fbdo, PATH_TO_APP, dataToApp);
 }
 
 void heatOven() {
