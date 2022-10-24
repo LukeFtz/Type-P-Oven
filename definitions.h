@@ -44,3 +44,19 @@ const char rootCACert[] PROGMEM = "-----BEGIN CERTIFICATE-----\n"
 
 #define PATH_TO_APP "/to_app"
 #define PATH_FROM_APP "/to_oven"
+
+#define FULLSTEP 4
+
+#define maxPosition 1600L
+#define maxTemp 300L
+
+#define motorPin1  D1
+#define motorPin2  D2
+#define motorPin3  D3
+#define motorPin4  D4
+
+#define ktcCLK  D5
+#define ktcCS   D6
+#define ktcSO   D7
+
+#define rele D0
