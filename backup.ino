@@ -39,17 +39,17 @@ FirebaseAuth auth;
 FirebaseConfig config;
 
 unsigned long sendDataPrevMillis = 0L;
-unsigned long timmer = 0L;
 
 // ############################################################## Recycle Data #####################################################
 unsigned int definedTime=0;
-long currentSec=0;
+unsigned int currentSec=0;
 
-long definedTemperature;
+int definedTemperature;
 int currentTemperature;
 
 long positionToGo=0L;
 bool moving = false;
+long roleBack = 0;
 
 AccelStepper motorStepper(FULLSTEP, motorPin1, motorPin3, motorPin2, motorPin4);
 MAX6675 ktc(ktcCLK, ktcCS, ktcSO);
@@ -61,7 +61,7 @@ bool startRecycling = false;
 bool firstTimeRecycle = true;
 
 bool setDefault = false;
-
+// int currentTemperature;
 // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@ temporaryData @@@@@@@@@@@@@@@@@@@@@@@@@@
 bool aux = true;
 bool auxConnect = true;
@@ -72,11 +72,10 @@ void setup(void) {
 
   WiFi.softAP(ssid, password);
 
-  Serial.print("AP IP address: ");
+  Serial.print(F("AP IP address: "));
   IPAddress myIP = WiFi.softAPIP();
   Serial.println(myIP);
   Serial.println(WiFi.softAPIP());
-  // Serial.println("HTTP server started");
   apiRoutes();
   
   Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
@@ -112,7 +111,12 @@ void setup(void) {
   motorStepper.setMaxSpeed(1000);
   motorStepper.setAcceleration(100.0);
   motorStepper.setSpeed(200);
-  
+  pinMode(rele, OUTPUT);
+  // digitalWrite(rele, LOW);
+  digitalWrite(rele, HIGH);
+
+
+
   server.begin();
   delay(500);
 }
@@ -164,7 +168,7 @@ void loop(void) {
 // ********************************************************* Network **************************************************************
 
 void apiRoutes(){
-  server.on("/", HTTP_GET, returnConnection);
+  server.on(F("/"), HTTP_GET, returnConnection);
   server.on(F("/scan"),HTTP_GET, getScanNetworks);
   server.on(F("/login"), HTTP_POST, setCredentials);
   server.on(F("/firebase"),HTTP_GET, getFirebaseConnection);
@@ -180,7 +184,7 @@ void returnConnection(){
 }
 
 void getScanNetworks() {
-  Serial.println("Scanning WiFi networks...");
+  Serial.println(F("Scanning WiFi networks..."));
   // int n = WiFi.scanNetworksAsync(scanWifi,false);
   WiFi.scanNetworks(true,false);
   
@@ -193,15 +197,15 @@ void getScanNetworks() {
   }
   int n = WiFi.scanComplete();
 
-  Serial.println("scan complete");
+  Serial.println(F("scan complete"));
   if (n == 0) {
-    Serial.println("no networks found");
+    Serial.println(F("no networks found"));
     JsonObject obj = doc.createNestedObject();
     obj["no_network"] = true;
     jsonArray.add(obj);
   } else {
     Serial.print(n);
-    Serial.println(" networks found:");
+    Serial.println(F(" networks found:"));
     
     String ssid;
     int rssi;
@@ -211,11 +215,11 @@ void getScanNetworks() {
       ssid = WiFi.SSID(i);
       rssi = WiFi.RSSI(i);
       security = WiFi.encryptionType(i) == WIFI_AP ? "none" : "enabled";
-      Serial.print("Name: ");
+      Serial.print(F("Name: "));
       Serial.print(ssid);
-      Serial.print(" - Strength: ");
+      Serial.print(F(" - Strength: "));
       Serial.print(rssi);
-      Serial.print(" - Security: ");
+      Serial.print(F(" - Security: "));
       Serial.println(security);
       obj["ssid"] = ssid;
       obj["strength"] = rssi;
@@ -240,6 +244,7 @@ void setCredentials(){
 
   while( WiFi.waitForConnectResult() == WL_IDLE_STATUS){
     Serial.println(WiFi.waitForConnectResult());
+    yield();
   }
   DynamicJsonDocument doc(1024);
   JsonObject obj = doc.createNestedObject();
@@ -294,7 +299,7 @@ void connectToFirebase(){
   if (!Firebase.beginStream(stream, PATH_FROM_APP)){
     Serial.printf("sream begin error, %s\n\n", stream.errorReason().c_str());
   }else{
-    Serial.println("Ready for response");
+    Serial.println(F("Ready for response"));
     Firebase.setStreamCallback(stream, streamCallback, streamTimeoutCallback);
     yield();
   }
@@ -317,7 +322,7 @@ void streamCallback(StreamData data)
       Serial.println(definedTemperature);
       prepareOven();
     }else if(dataFromApp["func"]=="STRT_HEAT") {
-      Serial.println("startHeat");
+      Serial.println(F("startHeat"));
       startHeatOven = true;
     }else if(dataFromApp["func"]=="APP_CONNECTED"){
       dataToApp.clear();
@@ -332,11 +337,9 @@ void streamCallback(StreamData data)
       cancelHeatAction();
     }else if (dataFromApp["func"]=="CANCEL_RECYCLE"){
       cancelRecycleAction();
+    }else if (dataFromApp["func"]=="SET_DEFAULT"){
+      setDefaultPosition();
     }
-    // }else if (dataFromApp["func"]=="SET_DEFAULT"){
-    //   setDefault=true;
-    //   setDefaultPosition();
-    // }
   }
   dataFromApp.clear();
 }
@@ -345,7 +348,7 @@ void streamTimeoutCallback(bool timeout)
 {
   if (timeout){
     
-    Serial.println("stream timed out, resuming...\n");
+    Serial.println(F("stream timed out, resuming...\n"));
   }
 
   if (!stream.httpConnected()){
@@ -359,7 +362,7 @@ void prepareOven() {
   dataToApp.clear();
   positionToGo = -(maxPosition * definedTemperature) / maxTemp;
   motorStepper.moveTo(positionToGo);
-  Serial.println("positionToGo");
+  Serial.println(F("positionToGo"));
   moving = true;
 
   while (moving) {
@@ -390,7 +393,7 @@ void setDefaultPosition() {
 void setPositionZero() {
   if (motorStepper.distanceToGo() == 0) {
     motorStepper.setCurrentPosition(0);
-    Serial.print("default position");
+    Serial.print(F("default position"));
     Serial.println(motorStepper.currentPosition());
     moving = false;
   }
@@ -403,7 +406,7 @@ void cancelHeatAction(){
     startHeatOven = false;
     firstTimeHeat = true;
   // }
-  Serial.println("HEAT canceled");
+  Serial.println(F("HEAT canceled"));
   dataToApp.add("func", "HEAT_CANCELED");
   Firebase.setJSON(fbdo, PATH_TO_APP, dataToApp);
 }
@@ -421,19 +424,20 @@ void cancelRecycleAction(){
 }
 
 void heatOven() {
-  int currentTemperature = ktc.readCelsius();
+  currentTemperature = ktc.readCelsius();
+  dataToApp.clear();
   
   if (firstTimeHeat) {
-    Serial.println("First pass");
+    Serial.println(F("First pass"));
     currentSec=0;
     digitalWrite(rele, LOW);
     dataToApp.add("func", "OVEN_HEATTING");
     Firebase.setJSON(fbdo, PATH_TO_APP, dataToApp);
     firstTimeHeat = false;
   }else if (currentSec % 2 == 0){
-    Serial.print("Temperatura: ");
+    Serial.print(F("Temperatura: "));
     Serial.print(currentTemperature);
-    Serial.println("*C");
+    Serial.println(F("*C"));
     dataToApp.add("func", "HEAT_TEMP");
     dataToApp.add("val", currentTemperature);
     // if(Firebase.ready()){
@@ -464,10 +468,10 @@ void startRecicle() {
     firstTimeRecycle = false;
   } else if (currentSec % 2 == 0) {
     currentTemperature = ktc.readCelsius();
-    if (currentTemperature > definedTemperature + 5) {
+    if (currentTemperature >= definedTemperature + 3) {
       digitalWrite(rele, HIGH);
     }
-    if (currentTemperature > definedTemperature - 5) {
+    if (currentTemperature <= definedTemperature - 3) {
       digitalWrite(rele, LOW);
     }
     dataToApp.add("func", "RECYCLING");

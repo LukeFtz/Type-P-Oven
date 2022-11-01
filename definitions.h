@@ -47,16 +47,20 @@ const char rootCACert[] PROGMEM = "-----BEGIN CERTIFICATE-----\n"
 
 #define FULLSTEP 4
 
-#define maxPosition 1600L
-#define maxTemp 300L
+#define maxPosition 1600
+#define maxTemp 300
 
 #define motorPin1  D1
 #define motorPin2  D2
 #define motorPin3  D3
-#define motorPin4  D4
+#define motorPin4  D5
 
-#define ktcCLK  D5
-#define ktcCS   D6
-#define ktcSO   D7
+// #define ktcCLK  D5
+// #define ktcCS   D6
+// #define ktcSO   D7
 
-#define rele 16
+#define ktcCLK  D8
+#define ktcCS   D7
+#define ktcSO   D6
+
+#define rele D4
