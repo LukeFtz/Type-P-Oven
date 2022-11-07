@@ -49,7 +49,7 @@ int currentTemperature;
 
 long positionToGo=0L;
 bool moving = false;
-long roleBack = 0;
+int roleBack = 0;
 
 AccelStepper motorStepper(FULLSTEP, motorPin1, motorPin3, motorPin2, motorPin4);
 MAX6675 ktc(ktcCLK, ktcCS, ktcSO);
@@ -61,9 +61,9 @@ bool startRecycling = false;
 bool firstTimeRecycle = true;
 
 bool setDefault = false;
+bool recycleFinished = false;
 // int currentTemperature;
 // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@ temporaryData @@@@@@@@@@@@@@@@@@@@@@@@@@
-bool aux = true;
 bool auxConnect = true;
 // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
@@ -131,12 +131,6 @@ void loop(void) {
     if(Firebase.ready() && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0)){
       sendDataPrevMillis = millis();
       currentSec++;
-      // if(aux){
-      //   dataToApp.add("func", "OVEN_CONNECTED");//@@@@@@@@@@@@@@@@@
-      //   // dataToApp.add("val", true);//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-      //   Firebase.setJSON(fbdo, PATH_TO_APP, dataToApp);
-      //   aux=false;
-      // }
       if (startHeatOven) {
         heatOven();
       }
@@ -146,6 +140,7 @@ void loop(void) {
       yield();
 
     }
+//     ****
     if(WiFi.isConnected() && auxConnect){
         if(Firebase.ready()){
           connectToFirebase();
@@ -301,9 +296,8 @@ void connectToFirebase(){
   }else{
     Serial.println(F("Ready for response"));
     Firebase.setStreamCallback(stream, streamCallback, streamTimeoutCallback);
-    yield();
   }
-}
+}  
 
 void streamCallback(StreamData data)
 {
@@ -337,6 +331,8 @@ void streamCallback(StreamData data)
       cancelHeatAction();
     }else if (dataFromApp["func"]=="CANCEL_RECYCLE"){
       cancelRecycleAction();
+    }else if (dataFromApp["func"]=="RECICLE_DONE"){
+      recycleFinished=true;
     }else if (dataFromApp["func"]=="SET_DEFAULT"){
       setDefaultPosition();
     }
@@ -361,8 +357,12 @@ void streamTimeoutCallback(bool timeout)
 void prepareOven() {
   dataToApp.clear();
   positionToGo = -(maxPosition * definedTemperature) / maxTemp;
-  motorStepper.moveTo(positionToGo);
-  Serial.println(F("positionToGo"));
+  roleBack = maxPosition + positionToGo;
+  motorStepper.moveTo(-maxPosition);
+  Serial.printf("Position to go");
+  Serial.println(positionToGo);
+  Serial.printf("Role back");
+  Serial.println(roleBack);
   moving = true;
 
   while (moving) {
@@ -378,19 +378,22 @@ void prepareOven() {
 }
 
 void setDefaultPosition() {
-  motorStepper.moveTo(-positionToGo);
+  // motorStepper.moveTo(-positionToGo);
+  motorStepper.moveTo(maxPosition);
   moving = true;
   while (moving) {
     motorStepper.run();
     setPositionZero();
     yield();
   }
-  // if(setDefault){
-    
-  // }
 }
 
 void setPositionZero() {
+    Serial.printf("current position ");
+    Serial.println(motorStepper.currentPosition());
+    Serial.printf("distance ");
+    Serial.println(motorStepper.distanceToGo());
+
   if (motorStepper.distanceToGo() == 0) {
     motorStepper.setCurrentPosition(0);
     Serial.print(F("default position"));
@@ -402,9 +405,9 @@ void setPositionZero() {
 void cancelHeatAction(){
   dataToApp.clear();
   // if (startHeatOven){
-    digitalWrite(rele, HIGH);
-    startHeatOven = false;
-    firstTimeHeat = true;
+  digitalWrite(rele, HIGH);
+  startHeatOven = false;
+  firstTimeHeat = true;
   // }
   Serial.println(F("HEAT canceled"));
   dataToApp.add("func", "HEAT_CANCELED");
@@ -414,9 +417,9 @@ void cancelHeatAction(){
 void cancelRecycleAction(){
   dataToApp.clear();
   // if (startRecycling) {
-    digitalWrite(rele, HIGH);
-    startRecycling = false;
-    firstTimeRecycle = true;
+  digitalWrite(rele, HIGH);
+  startRecycling = false;
+  firstTimeRecycle = true;
     // setDefaultPosition();
   // }
   dataToApp.add("func", "RECYCLE_CANCELED");
@@ -452,7 +455,7 @@ void heatOven() {
     firstTimeHeat = true;
     dataToApp.add("func", "HEAT_DONE");
     // if(Firebase.ready()){
-      Firebase.setJSON(fbdo, PATH_TO_APP, dataToApp);
+    Firebase.setJSON(fbdo, PATH_TO_APP, dataToApp);
     // }
   }
 }
@@ -465,6 +468,14 @@ void startRecicle() {
     digitalWrite(rele, LOW);
     dataToApp.add("func", "RECYCLE_STARTED");
     Firebase.setJSON(fbdo, PATH_TO_APP, dataToApp);
+    
+    // motorStepper.moveTo(roleBack);
+    // moving = true;
+    // while (moving) {
+    //   motorStepper.run();
+    //   setPositionZero();
+    //   yield();
+    // }
     firstTimeRecycle = false;
   } else if (currentSec % 2 == 0) {
     currentTemperature = ktc.readCelsius();
@@ -479,10 +490,11 @@ void startRecicle() {
     Firebase.setJSON(fbdo, PATH_TO_APP, dataToApp);
   }
 
-  if (currentSec >= definedTime){
+  if (currentSec >= definedTime || recycleFinished){
     digitalWrite(rele, HIGH);
     firstTimeRecycle = true;
     startRecycling = false;
+    recycleFinished = false;
     dataToApp.add("func", "RECYCLE_FINISHED");
     Firebase.setJSON(fbdo, PATH_TO_APP, dataToApp);
     setDefaultPosition();
