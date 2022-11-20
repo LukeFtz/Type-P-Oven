@@ -235,7 +235,6 @@ void setCredentials(){
 
   WiFi.begin(postSsid, postPassword);
   Serial.println(postSsid);
-  Serial.println(postPassword);
 
   while( WiFi.waitForConnectResult() == WL_IDLE_STATUS){
     Serial.println(WiFi.waitForConnectResult());
@@ -248,6 +247,7 @@ void setCredentials(){
       connectToFirebase();
       obj["connected"] = true;
       obj["status"] = "CONNECTED";
+      Serial.println("Connected");
   }else if (WiFi.waitForConnectResult()==WL_NO_SSID_AVAIL){
       obj["connected"] = false;
       obj["status"] = "SSID_UNREACHABLE";    
@@ -261,6 +261,7 @@ void setCredentials(){
       obj["connected"] = false;
       obj["status"] = "TIME_OUT";     
   }
+  auxConnect=true;
   String jsonSerialized;
   serializeJson(obj, jsonSerialized);
   server.send(202, "application/json", jsonSerialized);  
